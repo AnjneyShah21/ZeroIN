@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { decryptData } from '../lib/crypto';
+import type { EncryptionStrength } from '../lib/crypto';
 import { Lock, Download, Copy, Check, Flame, ShieldAlert, Key, Clock, Eye, Trash2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -16,6 +17,8 @@ interface PasteData {
   ciphertext: string;
   iv: string;
   salt?: string;
+  algorithm: 'AES-GCM';
+  keyLength: EncryptionStrength;
   isPasswordProtected: boolean;
   burnAfterReading: boolean;
   maxViews: number;
@@ -113,7 +116,8 @@ export const PasteViewer: React.FC = () => {
         pasteData.iv,
         rawKeyBase64,
         userPass,
-        pasteData.salt
+        pasteData.salt,
+        pasteData.keyLength || 256
       );
 
       const jsonStr = new TextDecoder().decode(decryptedBuffer);

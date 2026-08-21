@@ -1,19 +1,39 @@
 import React, { useState } from 'react';
 import { Lock, Clock, Flame, Eye, Upload, FileText, Code2, ShieldAlert, Terminal, Key, ChevronDown, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { encryptData, generateRandomSecret, hashSecret } from '../lib/crypto';
+import { DEFAULT_ENCRYPTION_STRENGTH, EncryptionStrength, encryptData, generateRandomSecret, hashSecret } from '../lib/crypto';
 import { ShareModal } from './ShareModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from '../lib/utils';
+import { ScrambleText } from './ScrambleText';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+
+const encryptionGuidance: Record<EncryptionStrength, { label: string; summary: string; caution: string }> = {
+  128: {
+    label: 'AES-128-GCM — STANDARD',
+    summary: 'Strong modern encryption and a sensible choice for most private content.',
+    caution: 'Not considered practically breakable today; it has a smaller long-term security margin than AES-256.',
+  },
+  192: {
+    label: 'AES-192-GCM — HIGH',
+    summary: 'Adds a larger key size while keeping the same authenticated AES-GCM protection.',
+    caution: 'No known practical weakness; AES-256 is the more common choice when maximum key length is wanted.',
+  },
+  256: {
+    label: 'AES-256-GCM — MAXIMUM',
+    summary: 'The highest AES level offered here and the default for highly sensitive content.',
+    caution: 'No known practical weakness; it is only marginally more computationally demanding than AES-128.',
+  },
+};
 
 export const PasteEditor: React.FC = () => {
   const [content, setContent] = useState('');
   const [expiry, setExpiry] = useState('1d');
   const [burnAfterReading, setBurnAfterReading] = useState(false);
   const [password, setPassword] = useState('');
+  const [encryptionStrength, setEncryptionStrength] = useState<EncryptionStrength>(DEFAULT_ENCRYPTION_STRENGTH);
   const [maxViews, setMaxViews] = useState(0);
   const [viewMode, setViewMode] = useState<'write' | 'preview'>('write');
   const [attachment, setAttachment] = useState<{ name: string; type: string; base64: string } | null>(null);
@@ -24,6 +44,8 @@ export const PasteEditor: React.FC = () => {
     rawKeyBase64: string;
     panicSecret: string;
   } | null>(null);
+  const [isIntroHovered, setIsIntroHovered] = useState(false);
+  const selectedEncryption = encryptionGuidance[encryptionStrength];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -43,13 +65,13 @@ export const PasteEditor: React.FC = () => {
     setIsEncrypting(true);
     setError(null);
     try {
-      const encrypted = await encryptData(JSON.stringify({ text: content, attachment: attachment || null, createdAt: new Date().toISOString() }), password);
+      const encrypted = await encryptData(JSON.stringify({ text: content, attachment: attachment || null, createdAt: new Date().toISOString() }), password, encryptionStrength);
       const panicSecret = generateRandomSecret(24);
       const panicDeleteHash = await hashSecret(panicSecret);
       const response = await fetch(`${API_BASE}/api/pastes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ciphertext: encrypted.ciphertext, iv: encrypted.iv, salt: encrypted.salt, isPasswordProtected: Boolean(password), burnAfterReading, expiry, maxViews: Number(maxViews), panicDeleteHash }),
+        body: JSON.stringify({ ciphertext: encrypted.ciphertext, iv: encrypted.iv, salt: encrypted.salt, algorithm: encrypted.algorithm, keyLength: encrypted.keyLength, isPasswordProtected: Boolean(password), burnAfterReading, expiry, maxViews: Number(maxViews), panicDeleteHash }),
       });
       if (!response.ok) { const errData = await response.json(); throw new Error(errData.error || 'Server rejected encrypted payload.'); }
       const resData = await response.json();
@@ -64,13 +86,13 @@ export const PasteEditor: React.FC = () => {
   return (
     <div className="w-full space-y-8 pb-20">
       {/* Banner */}
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="cyber-card rounded-xl p-8 relative overflow-hidden">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} onHoverStart={() => setIsIntroHovered(true)} onHoverEnd={() => setIsIntroHovered(false)} className="cyber-card rounded-xl p-8 relative overflow-hidden cursor-crosshair">
         <div className="flex items-center gap-4 mb-4">
           <Terminal className="w-6 h-6 text-emerald-400 flex-shrink-0" />
-          <h2 className="text-2xl font-black text-white uppercase tracking-widest">ZERO-KNOWLEDGE ENCRYPTED PASTE</h2>
+          <h2 className="text-2xl font-black text-white uppercase tracking-widest"><ScrambleText active={isIntroHovered} text="ZERO-KNOWLEDGE ENCRYPTED PASTE" /></h2>
         </div>
         <p className="text-sm text-emerald-500/90 font-mono font-semibold leading-relaxed">
-          YOUR CONTENT IS ENCRYPTED RIGHT HERE IN YOUR BROWSER WITH AES-256-GCM BEFORE BEING SENT OVER THE NETWORK. THE DECRYPTION KEY NEVER TOUCHES OUR SERVERS. PERIOD.
+          <ScrambleText active={isIntroHovered} text="CHOOSE YOUR ENCRYPTION LEVEL. YOUR CONTENT IS ENCRYPTED RIGHT HERE IN YOUR BROWSER WITH AUTHENTICATED AES-GCM BEFORE BEING SENT OVER THE NETWORK. THE DECRYPTION KEY NEVER TOUCHES OUR SERVERS. PERIOD." />
         </p>
       </motion.div>
 
@@ -188,6 +210,38 @@ export const PasteEditor: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Encryption choice — intentionally kept below the other paste settings. */}
+          <div className="bg-emerald-950/20 border border-emerald-500/40 rounded-lg p-5 space-y-4 font-mono">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-black text-emerald-300 flex items-center gap-2 uppercase tracking-wider">
+                <Lock className="w-4 h-4" /><span>CHOOSE ENCRYPTION LEVEL</span>
+              </label>
+              <p className="text-xs text-emerald-600 font-bold">AES-GCM IS AUTHENTICATED ENCRYPTION: IT PROTECTS CONTENT AND DETECTS TAMPERING.</p>
+            </div>
+
+            <div className="relative max-w-xl">
+              <select aria-label="Choose encryption level" value={encryptionStrength} onChange={(e) => setEncryptionStrength(Number(e.target.value) as EncryptionStrength)} className="w-full appearance-none bg-black border border-emerald-500/60 rounded-md px-4 pr-10 py-3 text-sm font-black text-emerald-300 focus:outline-none focus:border-emerald-300 cursor-pointer uppercase">
+                <option value={128}>AES-128-GCM — STANDARD</option>
+                <option value={192}>AES-192-GCM — HIGH</option>
+                <option value={256}>AES-256-GCM — MAXIMUM</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none w-5 h-5 text-emerald-400" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs leading-relaxed">
+              <div className="border border-emerald-900/70 bg-black/50 rounded p-3">
+                <div className="font-black text-emerald-400 uppercase">{selectedEncryption.label}</div>
+                <p className="mt-1 text-emerald-500/90 font-semibold">{selectedEncryption.summary}</p>
+              </div>
+              <div className="border border-amber-500/30 bg-amber-950/10 rounded p-3">
+                <div className="font-black text-amber-400 uppercase">Security note</div>
+                <p className="mt-1 text-amber-100/75 font-semibold">{selectedEncryption.caution}</p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-emerald-700 font-bold leading-relaxed">OTHER AES MODES SUCH AS CBC OR CTR ARE NOT OFFERED: WITHOUT CAREFUL EXTRA AUTHENTICATION THEY CAN BE EASIER TO MISUSE. ALL AVAILABLE LEVELS USE AES-GCM.</p>
+          </div>
         </div>
 
         {/* Error */}
@@ -209,7 +263,7 @@ export const PasteEditor: React.FC = () => {
           {isEncrypting ? (
             <><div className="w-5 h-5 border-2 border-emerald-700 border-t-emerald-400 rounded-full animate-spin" /><span>ENCRYPTING CLIENT-SIDE...</span></>
           ) : (
-            <><Lock className="w-5 h-5" /><span>ENCRYPT &amp; CREATE SECURE LINK</span></>
+            <><Lock className="w-5 h-5" /><ScrambleText text="ENCRYPT & CREATE SECURE LINK" hoverColor="#000000" /></>
           )}
         </motion.button>
       </motion.form>

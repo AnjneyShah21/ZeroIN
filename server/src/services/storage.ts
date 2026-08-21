@@ -6,6 +6,8 @@ export interface PastePayload {
   ciphertext: string;
   iv: string;
   salt?: string;
+  algorithm?: 'AES-GCM';
+  keyLength?: 128 | 192 | 256;
   isPasswordProtected: boolean;
   mimeType?: string;
   burnAfterReading: boolean;

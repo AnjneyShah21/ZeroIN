@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Terminal, Lock, ArrowDown, EyeOff, Flame, QrCode } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ScrambleText } from './ScrambleText';
 
 export const WelcomeHero: React.FC<{ onScrollToEditor: () => void }> = ({ onScrollToEditor }) => {
   const [demoText, setDemoText] = useState('Top secret payload 123');
   const [cipherPreview, setCipherPreview] = useState('');
   const [activeScore, setActiveScore] = useState(98);
+  const description = 'ZERO-KNOWLEDGE ENCRYPTED TEXT AND PAYLOAD ENGINE. ALL DATA IS ENCRYPTED CLIENT-SIDE BEFORE HITTING THE WIRE.';
+  const [hoveredWord, setHoveredWord] = useState<number | null>(null);
+  const [scrambledWord, setScrambledWord] = useState('');
+  const [isBrandHovered, setIsBrandHovered] = useState(false);
+  const [displayBrand, setDisplayBrand] = useState('ZEROIN');
+  const [hoveredFeature, setHoveredFeature] = useState<number | null>(null);
 
   useEffect(() => {
     let binary = '';
@@ -16,125 +22,197 @@ export const WelcomeHero: React.FC<{ onScrollToEditor: () => void }> = ({ onScro
     setActiveScore(85 + Math.floor(Math.random() * 15));
   }, [demoText]);
 
-  return (
-    <div className="relative overflow-hidden pt-12 pb-20 border-b border-emerald-900/30">
-      {/* Ambient Neon Glows */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/10 blur-[140px] pointer-events-none rounded-full" />
+  useEffect(() => {
+    if (hoveredWord === null) {
+      setScrambledWord('');
+      return;
+    }
 
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 relative z-10 space-y-16">
-        {/* Cyberpunk Headline with HUGE BOLD Font matching CLONEFEST */}
-        <div className="text-center max-w-5xl mx-auto space-y-8">
-          <motion.div 
+    const cipherChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&*?';
+    const words = description.split(/(\s+)/).filter((word) => !/^\s+$/.test(word));
+    const sourceWord = words[hoveredWord] || '';
+    const scramble = () => setScrambledWord(sourceWord.split('').map((character) => (
+      /[A-Z0-9]/.test(character) ? cipherChars[Math.floor(Math.random() * cipherChars.length)] : character
+    )).join(''));
+    scramble();
+    const interval = window.setInterval(() => {
+      scramble();
+    }, 70);
+
+    return () => window.clearInterval(interval);
+  }, [hoveredWord, description]);
+
+  useEffect(() => {
+    if (!isBrandHovered) {
+      setDisplayBrand('ZEROIN');
+      return;
+    }
+
+    const cipherChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#$%&*?';
+    const interval = window.setInterval(() => {
+      setDisplayBrand('ZEROIN'.split('').map(() => cipherChars[Math.floor(Math.random() * cipherChars.length)]).join(''));
+    }, 70);
+
+    return () => window.clearInterval(interval);
+  }, [isBrandHovered]);
+
+  return (
+    <div className="relative overflow-hidden pt-16 pb-24 border-b border-emerald-900/30">
+      <div className="max-w-7xl mx-auto px-6 sm:px-8 relative z-10 space-y-20">
+
+        {/* HERO */}
+        <div className="text-center space-y-8">
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-xs font-mono tracking-widest uppercase text-glow-emerald"
+            className="inline-block px-5 py-2 bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-xs font-mono tracking-widest uppercase"
           >
-            <Terminal className="w-4 h-4" />
-            <span>&gt;_ SYSTEM INITIALIZED, AWAITING HACKER INPUT..</span>
+            <ScrambleText text=">_ SYSTEM INITIALIZED, AWAITING HACKER INPUT.." />
           </motion.div>
 
-          <motion.h1 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-6xl sm:text-9xl font-black tracking-tighter text-white uppercase font-sans leading-none text-glow-emerald"
+            className="relative mx-auto flex h-56 w-full max-w-5xl items-center justify-center sm:h-72"
           >
-            ZEROIN <br />
-            <span className="text-emerald-400 font-extrabold tracking-tight">
-              2.0
-            </span>
-          </motion.h1>
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 12, ease: 'linear', repeat: Infinity }}
+              className="pointer-events-none absolute -inset-x-20 -inset-y-12 z-20 rounded-[50%] border border-dashed border-violet-300/55 shadow-[0_0_38px_rgba(139,92,246,0.28)]"
+            >
+              <motion.span
+                animate={{ rotate: -360 }}
+                transition={{ duration: 12, ease: 'linear', repeat: Infinity }}
+                className="absolute left-1/2 top-[-3rem] flex h-16 w-16 -translate-x-1/2 items-center justify-center rounded-full border-2 border-emerald-200 bg-gradient-to-br from-emerald-400 via-emerald-500 to-violet-500 text-xl font-black tracking-tighter text-black shadow-[0_0_28px_rgba(16,185,129,0.75)] sm:h-24 sm:w-24 sm:text-3xl"
+              >
+                1.0
+              </motion.span>
+            </motion.div>
+            <motion.h1
+              onHoverStart={() => setIsBrandHovered(true)}
+              onHoverEnd={() => setIsBrandHovered(false)}
+              animate={{ scale: isBrandHovered ? 1.025 : 1 }}
+              transition={{ duration: 0.12 }}
+              className="relative z-10 cursor-crosshair text-7xl sm:text-[10rem] font-black tracking-tighter text-white uppercase leading-none"
+              style={{ textShadow: '0 0 40px rgba(16,185,129,0.4)' }}
+            >
+              {displayBrand}
+            </motion.h1>
+          </motion.div>
 
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-base sm:text-xl text-emerald-400/90 font-mono max-w-3xl mx-auto leading-relaxed uppercase tracking-wider font-semibold"
+            className="cursor-default text-lg sm:text-2xl text-emerald-400/90 font-mono uppercase tracking-wider font-bold max-w-4xl mx-auto leading-relaxed"
           >
-            ZERO-KNOWLEDGE ENCRYPTED TEXT & PAYLOAD ENGINE. ALL DATA IS ENCRYPTED CLIENT-SIDE BEFORE HITTING THE WIRE.
+            {(() => {
+              let wordIndex = -1;
+              return description.split(/(\s+)/).map((token, tokenIndex) => {
+                if (/^\s+$/.test(token)) return token;
+                wordIndex += 1;
+                const currentWordIndex = wordIndex;
+                const isHovered = currentWordIndex === hoveredWord;
+                return (
+                  <motion.span
+                    key={`${token}-${tokenIndex}`}
+                    onHoverStart={() => setHoveredWord(currentWordIndex)}
+                    onHoverEnd={() => setHoveredWord(null)}
+                    animate={{ scale: isHovered ? 1.16 : 1, color: isHovered ? '#c4b5fd' : '#34d399' }}
+                    transition={{ duration: 0.12 }}
+                    className="inline-block cursor-crosshair"
+                  >
+                    {isHovered ? scrambledWord : token}
+                  </motion.span>
+                );
+              });
+            })()}
           </motion.p>
 
-          <motion.div 
+          <motion.button
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onScrollToEditor}
+            className="px-12 py-5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xl uppercase tracking-widest rounded-xl transition-all"
+            style={{ boxShadow: '0 0 40px rgba(16,185,129,0.6)' }}
           >
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={onScrollToEditor}
-              className="w-full sm:w-auto px-10 py-5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-lg uppercase tracking-widest rounded-xl shadow-[0_0_35px_rgba(16,185,129,0.6)] flex items-center justify-center gap-3 transition-all"
-            >
-              <Lock className="w-5 h-5" />
-              <span>ENTER PORTAL &rarr;</span>
-            </motion.button>
-          </motion.div>
+            <ScrambleText text="ENTER PORTAL" hoverColor="#000000" />
+          </motion.button>
         </div>
 
-        {/* Live Interactive Terminal Sandbox */}
-        <motion.div 
+        {/* LIVE SANDBOX */}
+        <motion.div
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="cyber-card rounded-xl p-6 sm:p-8 w-full shadow-2xl relative overflow-hidden"
+          className="cyber-card rounded-xl p-8 w-full"
         >
-          <div className="flex items-center justify-between border-b border-emerald-900/40 pb-4 mb-6 text-xs font-mono">
-            <span className="text-emerald-400 flex items-center gap-2 font-bold">
-              <Terminal className="w-4 h-4" />
-              WEB_CRYPTO_SANDBOX :: LIVE ENCRYPTION ENGINE
+          <div className="flex items-center justify-between border-b border-emerald-900/40 pb-5 mb-6">
+            <span className="text-base font-black text-emerald-400 uppercase tracking-widest">
+              WEB CRYPTO SANDBOX — LIVE ENCRYPTION ENGINE
             </span>
-            <span className="text-emerald-400 bg-emerald-950/80 px-2.5 py-1 rounded border border-emerald-500/40 font-bold">
-              ENTROPY_SCORE: {activeScore}%
+            <span className="text-sm text-emerald-400 bg-emerald-950 px-3 py-1 border border-emerald-500/40 font-black uppercase tracking-wider">
+              ENTROPY: {activeScore}%
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center font-mono">
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-500 uppercase font-bold">Input Plaintext Buffer</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+            <div className="space-y-3">
+              <label className="text-sm font-black text-emerald-500 uppercase tracking-widest block">INPUT PLAINTEXT BUFFER</label>
               <input
                 type="text"
                 value={demoText}
                 onChange={(e) => setDemoText(e.target.value)}
-                className="w-full bg-black border border-emerald-900/80 rounded p-4 text-base font-semibold text-emerald-300 focus:outline-none focus:border-emerald-500 shadow-inner"
+                className="w-full bg-black border border-emerald-900 rounded p-4 text-base font-mono font-bold text-emerald-300 focus:outline-none focus:border-emerald-500"
               />
             </div>
-
-            <div className="space-y-2">
-              <label className="text-xs text-emerald-500 uppercase font-bold">Encrypted Cipher Payload</label>
-              <div className="bg-black border border-emerald-500/40 rounded p-4 text-base font-mono text-emerald-400 truncate text-glow-emerald font-semibold">
+            <div className="space-y-3">
+              <label className="text-sm font-black text-emerald-500 uppercase tracking-widest block">ENCRYPTED CIPHER PAYLOAD</label>
+              <div className="bg-black border border-emerald-500/50 rounded p-4 text-base font-mono font-bold text-emerald-400 truncate"
+                style={{ textShadow: '0 0 10px rgba(16,185,129,0.5)' }}>
                 {cipherPreview}
               </div>
             </div>
           </div>
         </motion.div>
 
-        {/* Cyber Feature Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono">
-          <div className="cyber-card rounded-xl p-7 space-y-3">
-            <EyeOff className="w-7 h-7 text-emerald-400" />
-            <h3 className="text-base font-black text-white uppercase tracking-widest">[ Zero-Knowledge ]</h3>
-            <p className="text-xs text-emerald-500/90 leading-relaxed font-semibold">
-              Keys reside strictly in the URL hash fragment (`#key=...`). Never transmitted over HTTP requests.
+        {/* FEATURE CARDS — no icons, big text only */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <motion.div onHoverStart={() => setHoveredFeature(1)} onHoverEnd={() => setHoveredFeature(null)} className="cyber-card rounded-xl p-8 space-y-4">
+            <div className="text-xs font-black text-emerald-600 uppercase tracking-widest"><ScrambleText active={hoveredFeature === 1} text="FEATURE 01" /></div>
+            <h3 className="text-2xl font-black text-white uppercase tracking-tight leading-tight">
+              <ScrambleText active={hoveredFeature === 1} text="ZERO KNOWLEDGE" />
+            </h3>
+            <p className="text-sm font-bold text-emerald-500/90 font-mono uppercase leading-relaxed">
+              <ScrambleText active={hoveredFeature === 1} text="KEYS RESIDE IN THE URL HASH FRAGMENT ONLY. NEVER TRANSMITTED OVER HTTP. SERVER SEES ONLY CIPHERTEXT." />
             </p>
-          </div>
+          </motion.div>
 
-          <div className="cyber-card rounded-xl p-7 space-y-3">
-            <Flame className="w-7 h-7 text-amber-400" />
-            <h3 className="text-base font-black text-white uppercase tracking-widest">[ Panic Purge ]</h3>
-            <p className="text-xs text-emerald-500/90 leading-relaxed font-semibold">
-              Instantly destroy pastes with owner panic tokens or set payload auto-destruct upon reading.
+          <motion.div onHoverStart={() => setHoveredFeature(2)} onHoverEnd={() => setHoveredFeature(null)} className="cyber-card rounded-xl p-8 space-y-4">
+            <div className="text-xs font-black text-emerald-600 uppercase tracking-widest"><ScrambleText active={hoveredFeature === 2} text="FEATURE 02" /></div>
+            <h3 className="text-2xl font-black text-white uppercase tracking-tight leading-tight">
+              <ScrambleText active={hoveredFeature === 2} text="PANIC PURGE" />
+            </h3>
+            <p className="text-sm font-bold text-emerald-500/90 font-mono uppercase leading-relaxed">
+              <ScrambleText active={hoveredFeature === 2} text="INSTANTLY DESTROY PASTES VIA OWNER PANIC TOKENS OR SET AUTO-DESTRUCT ON FIRST READ." />
             </p>
-          </div>
+          </motion.div>
 
-          <div className="cyber-card rounded-xl p-7 space-y-3">
-            <QrCode className="w-7 h-7 text-cyan-400" />
-            <h3 className="text-base font-black text-white uppercase tracking-widest">[ Mobile QR Link ]</h3>
-            <p className="text-xs text-emerald-500/90 leading-relaxed font-semibold">
-              Cross-device instant transfer via client-rendered QR codes or PBKDF2 derived passwords.
+          <motion.div onHoverStart={() => setHoveredFeature(3)} onHoverEnd={() => setHoveredFeature(null)} className="cyber-card rounded-xl p-8 space-y-4">
+            <div className="text-xs font-black text-emerald-600 uppercase tracking-widest"><ScrambleText active={hoveredFeature === 3} text="FEATURE 03" /></div>
+            <h3 className="text-2xl font-black text-white uppercase tracking-tight leading-tight">
+              <ScrambleText active={hoveredFeature === 3} text="ENCRYPTION CHOICE" />
+            </h3>
+            <p className="text-sm font-bold text-emerald-500/90 font-mono uppercase leading-relaxed">
+              <ScrambleText active={hoveredFeature === 3} text="CHOOSE AES-GCM ENCRYPTION AT 128-, 192-, OR 256-BIT LEVELS. YOUR SELECTED PROTECTION STAYS CLIENT-SIDE." />
             </p>
-          </div>
+          </motion.div>
         </div>
+
       </div>
     </div>
   );

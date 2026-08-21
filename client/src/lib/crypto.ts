@@ -35,24 +35,29 @@ export interface EncryptedPayload {
   ciphertext: string; // Base64URL encoded
   iv: string;         // Base64URL encoded (12 bytes)
   salt?: string;       // Base64URL encoded (16 bytes, if password protected)
-  rawKeyBase64: string; // Base64URL string of 256-bit key
+  rawKeyBase64: string; // Base64URL string of the selected AES key
+  algorithm: 'AES-GCM';
+  keyLength: EncryptionStrength;
 }
 
+export type EncryptionStrength = 128 | 192 | 256;
+export const DEFAULT_ENCRYPTION_STRENGTH: EncryptionStrength = 256;
+
 /**
- * Generate a random 256-bit AES-GCM CryptoKey
+ * Generate a random AES-GCM CryptoKey at the selected strength.
  */
-export async function generateAesKey(): Promise<CryptoKey> {
+export async function generateAesKey(keyLength: EncryptionStrength): Promise<CryptoKey> {
   return window.crypto.subtle.generateKey(
-    { name: 'AES-GCM', length: 256 },
+    { name: 'AES-GCM', length: keyLength },
     true,
     ['encrypt', 'decrypt']
   );
 }
 
 /**
- * Derive an AES-256 key from a user password using PBKDF2
+ * Derive an AES-GCM key from a user password using PBKDF2.
  */
-export async function deriveKeyFromPassword(password: string, saltBytes: Uint8Array): Promise<CryptoKey> {
+export async function deriveKeyFromPassword(password: string, saltBytes: Uint8Array, keyLength: EncryptionStrength): Promise<CryptoKey> {
   const enc = new TextEncoder();
   const passwordKey = await window.crypto.subtle.importKey(
     'raw',
@@ -70,19 +75,20 @@ export async function deriveKeyFromPassword(password: string, saltBytes: Uint8Ar
       hash: 'SHA-256',
     },
     passwordKey,
-    { name: 'AES-GCM', length: 256 },
+    { name: 'AES-GCM', length: keyLength },
     true,
     ['encrypt', 'decrypt']
   );
 }
 
 /**
- * Encrypt plaintext (string or ArrayBuffer) using AES-256-GCM.
+ * Encrypt plaintext (string or ArrayBuffer) using AES-GCM.
  * If password is supplied, derives key with PBKDF2.
  */
 export async function encryptData(
   data: string | ArrayBuffer,
-  password?: string
+  password?: string,
+  keyLength: EncryptionStrength = DEFAULT_ENCRYPTION_STRENGTH
 ): Promise<EncryptedPayload> {
   const ivBytes = window.crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV
   let cryptoKey: CryptoKey;
@@ -91,9 +97,9 @@ export async function encryptData(
   if (password && password.trim().length > 0) {
     const saltBytes = window.crypto.getRandomValues(new Uint8Array(16));
     saltBase64 = arrayBufferToBase64Url(saltBytes.buffer as ArrayBuffer);
-    cryptoKey = await deriveKeyFromPassword(password, saltBytes);
+    cryptoKey = await deriveKeyFromPassword(password, saltBytes, keyLength);
   } else {
-    cryptoKey = await generateAesKey();
+    cryptoKey = await generateAesKey(keyLength);
   }
 
   // Convert string input to ArrayBuffer if necessary
@@ -119,6 +125,8 @@ export async function encryptData(
     iv: arrayBufferToBase64Url(ivBytes.buffer as ArrayBuffer),
     salt: saltBase64,
     rawKeyBase64,
+    algorithm: 'AES-GCM',
+    keyLength,
   };
 }
 
@@ -130,7 +138,8 @@ export async function decryptData(
   ivBase64: string,
   rawKeyBase64?: string,
   password?: string,
-  saltBase64?: string
+  saltBase64?: string,
+  keyLength: EncryptionStrength = DEFAULT_ENCRYPTION_STRENGTH
 ): Promise<ArrayBuffer> {
   const ciphertextBytes = base64UrlToArrayBuffer(ciphertextBase64);
   const ivBytes = base64UrlToArrayBuffer(ivBase64);
@@ -139,13 +148,13 @@ export async function decryptData(
 
   if (password && saltBase64) {
     const saltBytes = base64UrlToArrayBuffer(saltBase64);
-    cryptoKey = await deriveKeyFromPassword(password, saltBytes);
+    cryptoKey = await deriveKeyFromPassword(password, saltBytes, keyLength);
   } else if (rawKeyBase64) {
     const rawKeyBytes = base64UrlToArrayBuffer(rawKeyBase64);
     cryptoKey = await window.crypto.subtle.importKey(
       'raw',
       rawKeyBytes.buffer as BufferSource,
-      { name: 'AES-GCM', length: 256 },
+      { name: 'AES-GCM', length: keyLength },
       false,
       ['decrypt']
     );

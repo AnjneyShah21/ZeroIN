@@ -27,6 +27,8 @@ pasteRouter.post('/', async (req: Request, res: Response) => {
       ciphertext,
       iv,
       salt,
+      algorithm = 'AES-GCM',
+      keyLength = 256,
       isPasswordProtected = false,
       mimeType = 'text/plain',
       burnAfterReading = false,
@@ -45,6 +47,9 @@ pasteRouter.post('/', async (req: Request, res: Response) => {
     if (!panicDeleteHash || typeof panicDeleteHash !== 'string') {
       return res.status(400).json({ error: 'Panic delete token hash is required' });
     }
+    if (algorithm !== 'AES-GCM' || ![128, 192, 256].includes(Number(keyLength))) {
+      return res.status(400).json({ error: 'Unsupported encryption configuration' });
+    }
     if (ciphertext.length > MAX_CIPHERTEXT_SIZE) {
       return res.status(413).json({ error: 'Payload exceeds maximum limit (10MB)' });
     }
@@ -58,6 +63,8 @@ pasteRouter.post('/', async (req: Request, res: Response) => {
       ciphertext,
       iv,
       salt: salt || undefined,
+      algorithm,
+      keyLength: Number(keyLength) as 128 | 192 | 256,
       isPasswordProtected: Boolean(isPasswordProtected),
       mimeType,
       burnAfterReading: Boolean(burnAfterReading),
@@ -104,6 +111,8 @@ pasteRouter.get('/:id', async (req: Request, res: Response) => {
       ciphertext: paste.ciphertext,
       iv: paste.iv,
       salt: paste.salt,
+      algorithm: paste.algorithm || 'AES-GCM',
+      keyLength: paste.keyLength || 256,
       isPasswordProtected: paste.isPasswordProtected,
       mimeType: paste.mimeType,
       burnAfterReading: paste.burnAfterReading,
